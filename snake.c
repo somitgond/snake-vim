@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <stdint.h>
 
 #include "snake.h"
 
@@ -13,13 +14,17 @@
 
 static bool pauseGame = false;
 static bool exitGame  = false;
-static int stride = 2;
 static Directions snakeDir = UP;
+static int frameCounterMod = 10;
 
 Snake snakePixels[MAX_SNAKE_LEN];
 Vector2 snakePixelsPos[MAX_SNAKE_LEN];
 
 static int currSnakeLen = 1;
+
+static int currScore = 0;
+
+uint64_t frameCounter = 0;
 
 Food food;
 
@@ -31,7 +36,6 @@ char warningMsg[20];
 int main(void)
 {
   snakePixels[0] = initSnake();
-  snakePixels[0].color = GRAY;
 
   food = initFood();
   setFoodPosition();
@@ -92,69 +96,83 @@ void UpdateGame()
     // FIXME: hande if distance between screen edge and snakePixels rectangle is less than stride
     if(IsKeyPressed(KEY_H) || IsKeyPressedRepeat(KEY_H)) // towards left wall
     {
-      snakeDir = LEFT;
+      if(snakeDir != RIGHT) snakeDir = LEFT;
     }
     else if(IsKeyPressed(KEY_L) || IsKeyPressedRepeat(KEY_L)) // towards right wall
     {
-      snakeDir = RIGHT;
+      if(snakeDir != LEFT) snakeDir = RIGHT;
     }
     else if(IsKeyPressed(KEY_J) || IsKeyPressedRepeat(KEY_J)) // towards bottom wall
     {
-      snakeDir = DOWN;
+     if(snakeDir != UP)  snakeDir = DOWN;
     }
     else if(IsKeyPressed(KEY_K) || IsKeyPressedRepeat(KEY_K)) // towards Top wall
     {
-      snakeDir = UP;
+      if(snakeDir != DOWN)  snakeDir = UP;
     }
 
-    incrementPixPosition(0, snakeDir);
-
-    // FIXME: add snakePixels killed state
-    for(int i = 0; i < currSnakeLen; i++)
+    if(frameCounter%frameCounterMod == 0)
     {
-      // FIXME: reset in both cases
-      //1. if snakePixels hits a wall
-      if(snakePixels[i].position.x <= 0 || snakePixels[i].position.x >= screenWidth &&
-          snakePixels[i].position.y <= 0 || snakePixels[i].position.y >= screenHeight) 
+
+      incrementPixPosition(0, snakeDir);
+
+      // FIXME: add snakePixels killed state
+      for(int i = 0; i < currSnakeLen; i++)
       {
-        snakePixels[0].position.x = screenWidth/2;
-        snakePixels[0].position.y = screenHeight/2;
-        currSnakeLen = 1;
-        printf("Snake has hit a wall\n");
+        // FIXME: reset in both cases
+        //1. if snakePixels hits a wall
+        if(snakePixels[i].position.x < 0 || snakePixels[i].position.x >= screenWidth ||
+            snakePixels[i].position.y < 0 || snakePixels[i].position.y >= screenHeight) 
+        {
+          snakePixels[0].position.x = screenWidth/2;
+          snakePixels[0].position.y = screenHeight/2;
+          currSnakeLen = 1;
+          char s[] ="Snake has hit a wall";
+          TraceLog(LOG_INFO, s);
+        }
+
+        //2. if snakePixels bites itself
+        if( i != 0 && (abs(snakePixels[0].position.x - snakePixels[i].position.x) < DEFAULT_SIZE &&
+              abs(snakePixels[0].position.y - snakePixels[i].position.y) < DEFAULT_SIZE))
+        {
+          snakePixels[0].position.x = screenWidth/2;
+          snakePixels[0].position.y = screenHeight/2;
+          currSnakeLen = 1;
+          char s[] ="Snake has collided with itself";
+          TraceLog(LOG_INFO, s);
+        }
       }
 
-      //2. if snakePixels bites itself
-      if(0 && i != 0 && (abs(snakePixels[0].position.x - snakePixels[i].position.x) <= DEFAULT_SIZE &&
-          abs(snakePixels[0].position.y - snakePixels[i].position.y) <= DEFAULT_SIZE))
+      //if snakePixels eats the food
+      if(abs(snakePixels[0].position.x - food.position.x) <= DEFAULT_SIZE &&
+          abs(snakePixels[0].position.y - food.position.y) <= DEFAULT_SIZE)
       {
-        snakePixels[0].position.x = screenWidth/2;
-        snakePixels[0].position.y = screenHeight/2;
-        currSnakeLen = 1;
-        printf("Snake has collided with itself\n");
+        addSnakePix();
+
+        char s[128];
+        sprintf(s, "Snake has eaten food at: [%lf,%lf] ", food.position.x, food.position.y);
+        TraceLog(LOG_INFO, s);
+        setFoodPosition();
+
+        currScore++;
+        if(currScore % 5 == 0 && frameCounterMod > 2) frameCounterMod--;
       }
-    }
 
-    //if snakePixels eats the food
-    if(abs(snakePixels[0].position.x - food.position.x) <= DEFAULT_SIZE &&
-        abs(snakePixels[0].position.y - food.position.y) <= DEFAULT_SIZE)
-    {
-      snakePixels[currSnakeLen] = initSnake();
-      snakePixels[currSnakeLen].position = snakePixels[currSnakeLen-1].position;
-      incrementPixPosition(currSnakeLen, snakeDir);
-      printf("Snake has eaten food at: [%d,%d] \n", food.position.x, food.position.y);
-      currSnakeLen++;
-      setFoodPosition();
-      // update food position such that it lies outside the body of snakePixels
-    }
+      for(int i = 1; i < currSnakeLen; i++)
+      {
+        snakePixels[i].position = snakePixelsPos[i-1];
+      }
 
-    for(int i = 1; i < currSnakeLen; i++)
-    {
-      snakePixels[i].position = snakePixelsPos[i-1];
-    }
+      // update snakePixels position
+      for(int i = 0; i < currSnakeLen; i++)
+        snakePixelsPos[i] = snakePixels[i].position;
 
-    // update snakePixels position
-    for(int i = 0; i < currSnakeLen; i++)
-      snakePixelsPos[i] = snakePixels[i].position;
+      char s[128];
+      sprintf(s, "Snake head position: [%lf,%lf] ", snakePixels[0].position.x, snakePixels[0].position.y);
+      TraceLog(LOG_DEBUG, s);
+    }
+    frameCounter++;
+  
   }
 }
 
@@ -167,12 +185,21 @@ void DrawGame()
   screenHeight = GetScreenHeight();
   screenWidth  = GetScreenWidth();
 
+
   ClearBackground(LIGHTGRAY); // set background color
 
   UpdateGame();
+
+  // for 0th position draw rounded rectangle
+  Rectangle rect = {snakePixels[0].position.x,
+      snakePixels[0].position.y, 
+      snakePixels[0].size, 
+      snakePixels[0].size};
+
+  DrawRectangleRounded(rect, 0.8, 5, RED);
                               
   // Draw Snake
-  for(int i = 0; i < currSnakeLen; i++)
+  for(int i = 1; i < currSnakeLen; i++)
   {
     DrawRectangle(snakePixels[i].position.x,
                   snakePixels[i].position.y, 
@@ -180,6 +207,10 @@ void DrawGame()
                   snakePixels[i].size, 
                   snakePixels[i].color);
   }
+
+  // char s[128];
+  // sprintf(s, "SreenWidth: %d, ScreenHeight: %d", screenWidth, screenHeight);
+  // TraceLog(LOG_INFO, s);
   
   // Draw Food
   DrawRectangle(food.position.x,
@@ -198,10 +229,8 @@ struct Snake initSnake()
 {
   struct Snake snakePixels = {
     .position = {0, 0},
-    .color    = RED,
+    .color    = DARKBLUE,
     .size     = DEFAULT_SIZE,
-    .speed    = 1,
-    .active   = true,
   };
   return snakePixels;
 }
@@ -219,10 +248,25 @@ struct Food initFood()
 // FIXME: check if food position collids with any snake pixel
 void setFoodPosition()
 {
-  food.position.x = GetRandomValue(5, screenWidth);
-  food.position.y = GetRandomValue(5, screenHeight);
+  Vector2 newPos = {GetRandomValue(DEFAULT_SIZE, screenWidth-DEFAULT_SIZE),
+    GetRandomValue(DEFAULT_SIZE, screenHeight-DEFAULT_SIZE)};
+  int i = 0;
+  while(i < currSnakeLen)
+  {
+    if(abs(snakePixelsPos[i].x - newPos.x) < DEFAULT_SIZE && 
+        abs(snakePixelsPos[i].y - newPos.y) < DEFAULT_SIZE)
+    {
+      Vector2 tempPos =  {GetRandomValue(5, screenWidth), GetRandomValue(5, screenHeight)};
+      newPos = tempPos;
+      i = 0;
+      continue;
+    }
+    i++;
+  }
+  food.position = newPos;
+
   char s[128];
-  sprintf(s, "Food spawned at: [%d, %d]\n", food.position.x, food.position.y);
+  sprintf(s, "Food spawned at: [%lf, %lf]", food.position.x, food.position.y);
   TraceLog(LOG_INFO, s);
 }
 
@@ -231,16 +275,24 @@ void incrementPixPosition(int pixIdx, Directions snakeDir)
   switch (snakeDir)
   {
     case UP:
-      snakePixels[pixIdx].position.y -= stride;
+      snakePixels[pixIdx].position.y -= DEFAULT_SIZE;
       break;
     case DOWN:
-      snakePixels[pixIdx].position.y += stride;
+      snakePixels[pixIdx].position.y += DEFAULT_SIZE;
       break;
     case LEFT:
-      snakePixels[pixIdx].position.x -= stride;
+      snakePixels[pixIdx].position.x -= DEFAULT_SIZE;
       break;
     case RIGHT:
-      snakePixels[pixIdx].position.x += stride;
+      snakePixels[pixIdx].position.x += DEFAULT_SIZE;
       break;
   }
+}
+
+void addSnakePix()
+{
+  snakePixels[currSnakeLen] = initSnake();
+  snakePixels[currSnakeLen].position = snakePixels[currSnakeLen-1].position;
+
+  currSnakeLen++;
 }

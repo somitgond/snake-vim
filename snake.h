@@ -4,15 +4,13 @@
 
 #include "raylib.h"
 
-#define DEFAULT_SIZE 10
+#define DEFAULT_SIZE 15
 
 typedef struct Snake
 {
   Vector2 position;
   Color color;
   int size;
-  int speed;
-  bool active;
 } Snake;
 
 typedef struct Food
@@ -37,3 +35,4 @@ struct Snake initSnake();
 struct Food initFood();
 void setFoodPosition();
 void incrementPixPosition(int pixIdx, Directions snakeDir);
+void addSnakePix();
