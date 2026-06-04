@@ -15,7 +15,8 @@
 static bool pauseGame = false;
 static bool exitGame  = false;
 static Directions snakeDir = UP;
-static int frameCounterMod = 10;
+static uint64_t frameCounterMod = 15;
+static int size = 15;
 
 Snake snakePixels[MAX_SNAKE_LEN];
 Vector2 snakePixelsPos[MAX_SNAKE_LEN];
@@ -32,6 +33,7 @@ static int screenWidth = 450;
 static int screenHeight = 450;
 
 char warningMsg[20];
+char statusMsg[512];
 
 int main(void)
 {
@@ -77,19 +79,14 @@ void UpdateGame()
   if(IsKeyPressed(KEY_Q))
     exitGame = true;
 
-#if 0
   if(IsKeyPressed(KEY_EQUAL) || IsKeyPressedRepeat(KEY_EQUAL))
   {
-    // if(stride < INT_MAX) stride++;
-    if(snakePixelsPos.width < INT_MAX) snakePixelsPos.width++;
-    if(snakePixelsPos.height< INT_MAX) snakePixelsPos.height++;
+    if(size < 25) size++;
   }
   if(IsKeyPressed(KEY_MINUS) || IsKeyPressedRepeat(KEY_MINUS))
   {
-    if(snakePixelsPos.width > 0) snakePixelsPos.width--;
-    if(snakePixelsPos.height> 0) snakePixelsPos.height--;
+    if(size > 5) size--;
   }
-#endif
 
   if(!pauseGame)
   {
@@ -132,8 +129,8 @@ void UpdateGame()
         }
 
         //2. if snakePixels bites itself
-        if( i != 0 && (abs(snakePixels[0].position.x - snakePixels[i].position.x) < DEFAULT_SIZE &&
-              abs(snakePixels[0].position.y - snakePixels[i].position.y) < DEFAULT_SIZE))
+        if( i != 0 && (abs(snakePixels[0].position.x - snakePixels[i].position.x) < size &&
+              abs(snakePixels[0].position.y - snakePixels[i].position.y) < size))
         {
           snakePixels[0].position.x = screenWidth/2;
           snakePixels[0].position.y = screenHeight/2;
@@ -144,8 +141,8 @@ void UpdateGame()
       }
 
       //if snakePixels eats the food
-      if(abs(snakePixels[0].position.x - food.position.x) <= DEFAULT_SIZE &&
-          abs(snakePixels[0].position.y - food.position.y) <= DEFAULT_SIZE)
+      if(abs(snakePixels[0].position.x - food.position.x) <= size &&
+          abs(snakePixels[0].position.y - food.position.y) <= size)
       {
         addSnakePix();
 
@@ -185,16 +182,14 @@ void DrawGame()
   screenHeight = GetScreenHeight();
   screenWidth  = GetScreenWidth();
 
-
-  ClearBackground(LIGHTGRAY); // set background color
+  ClearBackground(BLACK); // set background color
 
   UpdateGame();
 
   // for 0th position draw rounded rectangle
   Rectangle rect = {snakePixels[0].position.x,
       snakePixels[0].position.y, 
-      snakePixels[0].size, 
-      snakePixels[0].size};
+      size, size};
 
   DrawRectangleRounded(rect, 0.8, 5, RED);
                               
@@ -203,24 +198,22 @@ void DrawGame()
   {
     DrawRectangle(snakePixels[i].position.x,
                   snakePixels[i].position.y, 
-                  snakePixels[i].size, 
-                  snakePixels[i].size, 
+                  size, 
+                  size, 
                   snakePixels[i].color);
   }
-
-  // char s[128];
-  // sprintf(s, "SreenWidth: %d, ScreenHeight: %d", screenWidth, screenHeight);
-  // TraceLog(LOG_INFO, s);
   
   // Draw Food
   DrawRectangle(food.position.x,
           food.position.y, 
-          food.size, 
-          food.size, 
+          size, 
+          size, 
           food.color);
 
-  if(strlen(warningMsg) > 0)
-    DrawText(warningMsg, screenWidth/2 , 0, 30, BLACK);
+  // show status message on top half
+
+  sprintf(statusMsg, "Current Score: %d | %s", currScore, warningMsg);
+  DrawText(statusMsg, screenWidth/2 , 0, 15, WHITE);
 
   EndDrawing();
 }
@@ -230,7 +223,6 @@ struct Snake initSnake()
   struct Snake snakePixels = {
     .position = {0, 0},
     .color    = DARKBLUE,
-    .size     = DEFAULT_SIZE,
   };
   return snakePixels;
 }
@@ -239,7 +231,6 @@ struct Food initFood()
 {
   struct Food food = {
     .position = {0, 0},
-    .size  = DEFAULT_SIZE,
     .color = BLUE,
   };
   return food;
@@ -248,13 +239,13 @@ struct Food initFood()
 // FIXME: check if food position collids with any snake pixel
 void setFoodPosition()
 {
-  Vector2 newPos = {GetRandomValue(DEFAULT_SIZE, screenWidth-DEFAULT_SIZE),
-    GetRandomValue(DEFAULT_SIZE, screenHeight-DEFAULT_SIZE)};
+  Vector2 newPos = {GetRandomValue(size, screenWidth-size),
+    GetRandomValue(size, screenHeight-size)};
   int i = 0;
   while(i < currSnakeLen)
   {
-    if(abs(snakePixelsPos[i].x - newPos.x) < DEFAULT_SIZE && 
-        abs(snakePixelsPos[i].y - newPos.y) < DEFAULT_SIZE)
+    if(abs(snakePixelsPos[i].x - newPos.x) < size && 
+        abs(snakePixelsPos[i].y - newPos.y) < size)
     {
       Vector2 tempPos =  {GetRandomValue(5, screenWidth), GetRandomValue(5, screenHeight)};
       newPos = tempPos;
@@ -275,16 +266,16 @@ void incrementPixPosition(int pixIdx, Directions snakeDir)
   switch (snakeDir)
   {
     case UP:
-      snakePixels[pixIdx].position.y -= DEFAULT_SIZE;
+      snakePixels[pixIdx].position.y -= size;
       break;
     case DOWN:
-      snakePixels[pixIdx].position.y += DEFAULT_SIZE;
+      snakePixels[pixIdx].position.y += size;
       break;
     case LEFT:
-      snakePixels[pixIdx].position.x -= DEFAULT_SIZE;
+      snakePixels[pixIdx].position.x -= size;
       break;
     case RIGHT:
-      snakePixels[pixIdx].position.x += DEFAULT_SIZE;
+      snakePixels[pixIdx].position.x += size;
       break;
   }
 }

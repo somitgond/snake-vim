@@ -4,20 +4,17 @@
 
 #include "raylib.h"
 
-#define DEFAULT_SIZE 15
 
 typedef struct Snake
 {
   Vector2 position;
   Color color;
-  int size;
 } Snake;
 
 typedef struct Food
 {
   Vector2 position;
   Color color;
-  int size;
 } Food;
 
 typedef enum Directions
